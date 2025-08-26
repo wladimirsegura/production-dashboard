@@ -137,4 +137,4 @@ supabase/
 ```
 
 ## ライセンス
-new test6
+new test7
