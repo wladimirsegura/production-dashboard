@@ -6,10 +6,10 @@ import { replaceCSVHeaders, englishCSVRowToProduction } from '@/lib/csv-header-r
 const encoder = new TextEncoder()
 
 // Dynamic import for papaparse to handle potential missing dependency
-let Papa: any = null
+let Papa: typeof import('papaparse') | null = null
 try {
-  Papa = require('papaparse')
-} catch (error) {
+  Papa = require('papaparse') as typeof import('papaparse')
+} catch {
   console.warn('papaparse not installed. Please run: npm install papaparse @types/papaparse')
 }
 
@@ -80,18 +80,18 @@ export async function POST(request: NextRequest) {
     
     if (parseResult.data && parseResult.data.length > 0) {
       console.log('First CSV row (headers check):', parseResult.data[0])
-      console.log('CSV column headers:', Object.keys(parseResult.data[0] as any))
+      console.log('CSV column headers:', Object.keys(parseResult.data[0] as Record<string, unknown>))
     }
 
     if (parseResult.errors.length > 0) {
       console.error('CSV parsing errors:', parseResult.errors)
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'CSVファイルの解析中にエラーが発生しました',
-        details: parseResult.errors 
+        details: parseResult.errors
       }, { status: 400 })
     }
 
-    const csvData = parseResult.data as any[]
+    const csvData = parseResult.data as Record<string, unknown>[]
     
     if (!csvData || csvData.length === 0) {
       return NextResponse.json({ error: 'CSVファイルにデータがありません' }, { status: 400 })
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     // Convert CSV rows to production data using English headers
     console.log('Converting CSV data to production data...')
-    const filteredData = csvData.filter((row: any) => row && Object.keys(row).length > 0)
+    const filteredData = csvData.filter((row: Record<string, unknown>) => row && Object.keys(row).length > 0)
     console.log('Filtered data count:', filteredData.length)
     
     // Get CSV headers (should now be English)
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Convert to production data format
-    const productionData = filteredData.map((row: any) => englishCSVRowToProduction(row))
+    const productionData = filteredData.map((row: Record<string, unknown>) => englishCSVRowToProduction(row))
     console.log('Production data prepared, count:', productionData.length)
     
     // Debug: Log a sample row after conversion
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
 
     // Process in batches to avoid timeout
     const BATCH_SIZE = 1000
-    const batches = []
+    const batches: ReturnType<typeof englishCSVRowToProduction>[][] = []
     for (let i = 0; i < productionData.length; i += BATCH_SIZE) {
       batches.push(productionData.slice(i, i + BATCH_SIZE))
     }
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
               setTimeout(() => reject(new Error('Batch timeout')), 60000)
             })
             
-            const { data: batchData, error } = await Promise.race([batchPromise, timeoutPromise]) as any
+            const { data: batchData, error } = await Promise.race([batchPromise, timeoutPromise]) as { data: { id: string }[] | null; error: Error | null }
             
             if (error) {
               console.error(`Batch ${i + 1} insert error:`, error)

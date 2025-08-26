@@ -33,7 +33,7 @@ export async function GET() {
       console.error('Date range query error:', dateError)
     }
 
-    const dates = dateRange?.map((row: any) => row.due_date) || []
+    const dates = dateRange?.map((row: { due_date: string }) => row.due_date) || []
     const minDate = dates.length > 0 ? dates[0] : null
     const maxDate = dates.length > 0 ? dates[dates.length - 1] : null
 

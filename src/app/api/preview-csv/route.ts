@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { replaceCSVHeaders } from '@/lib/csv-header-replacer'
 
 // Dynamic import for papaparse
-let Papa: any = null
+let Papa: typeof import('papaparse') | null = null
 try {
-  Papa = require('papaparse')
-} catch (error) {
+  Papa = require('papaparse') as typeof import('papaparse')
+} catch {
   console.warn('papaparse not installed')
 }
 
@@ -38,12 +38,12 @@ export async function POST(request: NextRequest) {
     try {
       content = new TextDecoder('shift-jis').decode(arrayBuffer)
       console.log('Successfully decoded as Shift-JIS')
-    } catch (error) {
+    } catch {
       try {
         content = new TextDecoder('utf-8').decode(arrayBuffer)
         encoding = 'utf-8'
         console.log('Successfully decoded as UTF-8')
-      } catch (error2) {
+      } catch {
         content = new TextDecoder().decode(arrayBuffer)
         encoding = 'default'
         console.log('Using default decoder')
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       console.log('Parse errors:', parseResult.errors)
     }
     
-    const headers = parseResult.data.length > 0 ? Object.keys(parseResult.data[0] as any) : []
+    const headers = parseResult.data.length > 0 ? Object.keys(parseResult.data[0] as Record<string, unknown>) : []
     
     return NextResponse.json({
       success: true,

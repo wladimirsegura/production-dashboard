@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
     const customer = searchParams.get('customer')
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('productions')
       .select('*')
       .order('due_date', { ascending: true })

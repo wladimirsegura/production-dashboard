@@ -13,6 +13,7 @@ interface ProductionQueryResult {
   order_quantity: number | null
   bending_count: number | null
   brazing_count: number | null
+  line_code: string | null
 }
 
 interface ProcessedData {
@@ -54,15 +55,9 @@ export async function GET(request: NextRequest) {
       console.log(`📅 Fetching all dates for showAllProductionDates`)
     }
 
-    let query = supabaseAdmin
-      .from('productions')
-      .select('customer_name, due_date, order_quantity, bending_count, brazing_count, line_code')
-      .not('due_date', 'is', null)
-      
+    // Remove unused query variable - we'll use batching approach instead
     // Filter by line codes if provided
-    if (lineCodes && lineCodes.length > 0) {
-      query = query.in('line_code', lineCodes)
-    }
+    const shouldFilterLineCodes = lineCodes && lineCodes.length > 0
     
     // Filter by selected date if provided
     if (selectedDate) {
@@ -76,7 +71,7 @@ export async function GET(request: NextRequest) {
     console.log('🚀 Fetching ALL records using batching approach (like upload)')
     
     const BATCH_SIZE = 1000
-    let allData: any[] = []
+    let allData: ProductionQueryResult[] = []
     let offset = 0
     let hasMoreData = true
     let batchCount = 0
@@ -93,7 +88,7 @@ export async function GET(request: NextRequest) {
         .range(offset, offset + BATCH_SIZE - 1)
       
       // Apply same filters to each batch
-      if (lineCodes && lineCodes.length > 0) {
+      if (shouldFilterLineCodes) {
         batchQuery = batchQuery.in('line_code', lineCodes)
       }
       
@@ -140,7 +135,7 @@ export async function GET(request: NextRequest) {
     
     // Show all unique due_dates in raw data
     if (data && data.length > 0) {
-      const rawDueDates = [...new Set(data.map((row: any) => row.due_date).filter((date: any) => date))] as string[]
+      const rawDueDates = [...new Set(data.map((row: ProductionQueryResult) => row.due_date).filter((date: string | null): date is string => date !== null))]
       rawDueDates.sort((a: string, b: string) => new Date(a).getTime() - new Date(b).getTime())
       console.log(`📅 Raw dates from database (${rawDueDates.length} unique dates):`, rawDueDates)
     }
@@ -221,9 +216,8 @@ export async function GET(request: NextRequest) {
     })
 
     // Filter and group customers according to requirements
-    const targetCustomers = ['5110', '4117', '4119', '4217', '5121', '5123', '4176', '4293']
     const filteredData: CrossTabData[] = []
-    let othersData: CrossTabData = {
+    const othersData: CrossTabData = {
       customer: 'その他',
       dates: {},
       total: 0
@@ -344,7 +338,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       data: filteredData,
       dates: datesWithData,
-      availableLineCodes: [...new Set(allData.map((row: any) => row.line_code).filter((code: any) => code))]
+      availableLineCodes: [...new Set(allData.map((row: ProductionQueryResult) => row.line_code).filter((code: string | null): code is string => code !== null))]
     })
 
   } catch (error) {
