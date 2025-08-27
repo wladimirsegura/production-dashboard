@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { replaceCSVHeaders } from '@/lib/csv-header-replacer'
 
-// Dynamic import for papaparse
-let Papa: typeof import('papaparse') | null = null
-try {
-  Papa = require('papaparse') as typeof import('papaparse')
-} catch {
-  console.warn('papaparse not installed')
-}
-
 export async function POST(request: NextRequest) {
+  // Dynamic import for papaparse
+  let Papa: typeof import('papaparse') | null = null
+  try {
+    Papa = await import('papaparse')
+  } catch {
+    console.warn('papaparse not installed')
+  }
   console.log('Preview CSV API called')
   
   try {

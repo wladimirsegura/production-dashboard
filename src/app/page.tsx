@@ -89,7 +89,7 @@ export default function Home() {
                   }
                 }
               }
-            } catch (e) {
+            } catch {
               // Ignore JSON parsing errors for partial responses
               // This is expected as the response might be incomplete
             }
@@ -102,7 +102,7 @@ export default function Home() {
             try {
               const result = JSON.parse(xhr.responseText)
               resolve(result)
-            } catch (e) {
+            } catch {
               reject(new Error('Invalid response format'))
             }
           } else {
@@ -117,7 +117,7 @@ export default function Home() {
               } else {
                 reject(new Error(result.error || `Error: ${xhr.status}`))
               }
-            } catch (e) {
+            } catch {
               reject(new Error(`Error: ${xhr.status}`))
             }
           }
@@ -142,7 +142,7 @@ export default function Home() {
       xhr.send(formData)
       
       // Wait for the upload to complete
-      const result = await uploadPromise
+      const result = await uploadPromise as { message: string }
       
       clearTimeout(timeoutId)
       setUploadProgress(100) // Complete the progress
@@ -296,13 +296,6 @@ export default function Home() {
     }
   }
 
-  // Function to display all dates
-  const showAllDates = () => {
-    // Set selectedDate to empty to indicate we want to show all dates
-    setSelectedDate('')
-    // Fetch data with all dates
-    fetchCrossTabData()
-  }
 
   // Function to show all production dates (not limited to 6)
   const showAllProductionDates = () => {

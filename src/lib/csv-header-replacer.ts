@@ -82,7 +82,7 @@ export function replaceCSVHeaders(csvContent: string): string {
 }
 
 // Simple production data converter for English headers
-export function englishCSVRowToProduction(row: any) {
+export function englishCSVRowToProduction(row: Record<string, unknown>) {
   return {
     arrangement_method: safeParseString(row.arrangement_method),
     inspection_type: safeParseString(row.inspection_type),
@@ -114,7 +114,7 @@ export function englishCSVRowToProduction(row: any) {
 }
 
 // Helper function to safely parse strings
-function safeParseString(value: any): string | null {
+function safeParseString(value: unknown): string | null {
   if (!value || value.toString().trim() === '' || value.toString().trim() === '0') {
     return null
   }
@@ -122,7 +122,7 @@ function safeParseString(value: any): string | null {
 }
 
 // Helper function to safely truncate strings to specified length
-function safeTruncateString(value: any, maxLength: number): string | null {
+function safeTruncateString(value: unknown, maxLength: number): string | null {
   if (!value || value.toString().trim() === '' || value.toString().trim() === '0') {
     return null
   }
@@ -131,7 +131,7 @@ function safeTruncateString(value: any, maxLength: number): string | null {
 }
 
 // Helper function to safely parse dates
-function safeParseDate(value: any): string | null {
+function safeParseDate(value: unknown): string | null {
   if (!value || value.toString().trim() === '' || value.toString().trim() === '0') {
     return null
   }
@@ -157,7 +157,7 @@ function safeParseDate(value: any): string | null {
     if (!isNaN(date.getTime())) {
       return date.toISOString().split('T')[0] // YYYY-MM-DD format
     }
-  } catch (error) {
+  } catch {
     console.log(`Could not parse date: ${dateStr}`)
   }
   
@@ -165,7 +165,7 @@ function safeParseDate(value: any): string | null {
 }
 
 // Helper function to safely parse integers
-function safeParseInt(value: any): number | null {
+function safeParseInt(value: unknown): number | null {
   if (!value || value.toString().trim() === '' || value.toString().trim() === '0') return null
   const parsed = parseInt(value.toString().trim(), 10)
   return isNaN(parsed) ? null : parsed

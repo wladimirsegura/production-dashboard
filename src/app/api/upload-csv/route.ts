@@ -5,16 +5,14 @@ import { replaceCSVHeaders, englishCSVRowToProduction } from '@/lib/csv-header-r
 // Text encoder for response streaming
 const encoder = new TextEncoder()
 
-// Dynamic import for papaparse to handle potential missing dependency
-let Papa: typeof import('papaparse') | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  Papa = require('papaparse') as typeof import('papaparse')
-} catch {
-  console.warn('papaparse not installed. Please run: npm install papaparse @types/papaparse')
-}
-
 export async function POST(request: NextRequest) {
+  // Dynamic import for papaparse to handle potential missing dependency
+  let Papa: typeof import('papaparse') | null = null
+  try {
+    Papa = await import('papaparse')
+  } catch {
+    console.warn('papaparse not installed. Please run: npm install papaparse @types/papaparse')
+  }
   console.log('Upload CSV API called')
   try {
     // Check if papaparse is available
@@ -161,7 +159,6 @@ export async function POST(request: NextRequest) {
               .insert(batches[i])
               .select('id')
             
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const timeoutPromise = new Promise((_, reject) => {
               setTimeout(() => reject(new Error('Batch timeout')), 60000)
             })
