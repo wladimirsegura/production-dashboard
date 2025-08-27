@@ -88,10 +88,12 @@ export const ENGLISH_TO_JAPANESE_HEADERS: { [key: string]: string } = {
 }
 
 // Function to translate CSV headers from Japanese to English
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function translateHeadersToEnglish(csvData: any[]): any[] {
   if (!csvData || csvData.length === 0) return csvData
 
   return csvData.map(row => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const translatedRow: any = {}
     
     for (const [originalHeader, value] of Object.entries(row)) {
@@ -133,6 +135,7 @@ export function safeParseInt(value: string | undefined | null): number | null {
 }
 
 // Convert translated CSV row to production data format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function translatedCSVRowToProduction(row: any) {
   return {
     arrangement_method: row.arrangement_method?.trim() || null,

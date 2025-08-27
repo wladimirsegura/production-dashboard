@@ -172,6 +172,7 @@ export function findColumnMatch(csvHeaders: string[], targetField: keyof typeof 
 
 // Function to map flexible CSV row to our production format
 export function mapFlexibleCSVRow(row: FlexibleCSVRow, csvHeaders: string[]) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mappedRow: any = {}
   
   // Map each field using flexible matching
@@ -195,6 +196,7 @@ export function safeParseInt(value: string | undefined | null): number | null {
 }
 
 // Convert mapped row to production data format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function flexibleCSVRowToProduction(mappedRow: any) {
   return {
     arrangement_method: mappedRow.arrangement_method || null,

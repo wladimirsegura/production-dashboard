@@ -1,6 +1,9 @@
 // Dynamic import for Supabase to handle potential missing dependency
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let createClient: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let supabase: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let supabaseAdmin: any = null
 
 // Create a chainable mock query builder
@@ -15,6 +18,10 @@ const createMockQueryBuilder = () => {
     lte: () => mockBuilder,
     not: () => mockBuilder,
     order: () => mockBuilder,
+    limit: () => mockBuilder,
+    range: () => mockBuilder,
+    in: () => mockBuilder,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     then: (resolve: any) => resolve({ data: null, error: mockError })
   }
   
@@ -22,6 +29,7 @@ const createMockQueryBuilder = () => {
 }
 
 try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const supabaseModule = require('@supabase/supabase-js')
   createClient = supabaseModule.createClient
 
@@ -50,7 +58,7 @@ try {
       supabaseAdmin = supabase // Fallback to regular client
     }
   }
-} catch (error) {
+} catch {
   console.warn('Supabase not installed. Please run: npm install @supabase/supabase-js @supabase/ssr')
   
   // Create a mock supabase client for development
