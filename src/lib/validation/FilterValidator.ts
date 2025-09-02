@@ -4,7 +4,7 @@
  */
 
 import type { FilterParams, ValidationResult } from '@/lib/types/FilterTypes'
-import { QUERY_LIMITS, ERROR_MESSAGES } from '@/lib/constants/FilterDefaults'
+import { QUERY_LIMITS } from '@/lib/constants/FilterDefaults'
 
 export class FilterValidator {
   /**

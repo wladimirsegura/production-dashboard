@@ -21,6 +21,7 @@ export interface UploadDetails {
   totalRecords: number
   inserted: number
   updated: number
+  processed: number
   processingTime: number
   fileName: string
 }
@@ -145,7 +146,7 @@ export async function getStorageFileInfo(fileName: string) {
       return null
     }
     
-    return data.find(file => file.name === fileName)
+    return data.find((file: { name: string }) => file.name === fileName)
   } catch (error) {
     console.error('File info exception:', error)
     return null
@@ -185,7 +186,7 @@ export async function performBulkUpload(
 ): Promise<{
   success: boolean
   message?: string
-  details?: any
+  details?: UploadDetails
   error?: string
 }> {
   let uploadedFileName: string | undefined
@@ -211,9 +212,12 @@ export async function performBulkUpload(
         success: false,
         error: `データ処理に失敗しました: ${processResult.errors.join(', ')}`,
         details: {
+          totalRecords: processResult.totalRecords,
+          inserted: processResult.inserted,
+          updated: processResult.updated,
           processed: processResult.inserted,
-          total: processResult.totalRecords,
-          processingTime: processResult.processingTime
+          processingTime: processResult.processingTime,
+          fileName: file.name
         }
       }
     }
@@ -224,6 +228,8 @@ export async function performBulkUpload(
       message: `${processResult.totalRecords}件のデータを正常に処理しました`,
       details: {
         totalRecords: processResult.totalRecords,
+        inserted: processResult.inserted,
+        updated: processResult.updated,
         processed: processResult.inserted,
         processingTime: processResult.processingTime,
         fileName: file.name

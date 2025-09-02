@@ -83,8 +83,8 @@ export class CrossTabService {
    * Fetch filtered production data using batching for performance
    */
   private async fetchFilteredData(
-    filters: ProductionFilters, 
-    options: CrossTabOptions
+    filters: ProductionFilters,
+    _options: CrossTabOptions
   ): Promise<ProductionQueryResult[]> {
     const BATCH_SIZE = FILTER_DEFAULTS.batchSize
     let allData: ProductionQueryResult[] = []

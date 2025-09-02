@@ -3,7 +3,7 @@
  * Handles query building and parameter management for production data
  */
 
-import type { FilterParams, FilterCondition, QueryFilters } from '@/lib/types/FilterTypes'
+import type { FilterParams, FilterCondition } from '@/lib/types/FilterTypes'
 import { FilterValidator } from '@/lib/validation/FilterValidator'
 import { FILTER_DEFAULTS } from '@/lib/constants/FilterDefaults'
 
@@ -182,6 +182,7 @@ export class ProductionFilters {
   /**
    * Build Supabase query from filter conditions
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   buildQuery(baseQuery: any): any {
     let query = baseQuery
 
@@ -303,7 +304,7 @@ export class ProductionFilters {
    */
   static fromURLParams(searchParams: URLSearchParams): ProductionFilters {
     const params: FilterParams = {
-      displayMode: (searchParams.get('displayMode') as any) || 'quantity',
+      displayMode: (searchParams.get('displayMode') as 'quantity' | 'bending' | 'brazing') || 'quantity',
       lineCodePrefixes: searchParams.get('lineCodePrefixes')?.split(',').filter(Boolean) || [],
       machineNumbers: searchParams.get('machineNumbers')?.split(',').filter(Boolean) || [],
       subcontractors: searchParams.get('subcontractors')?.split(',').filter(Boolean) || [],

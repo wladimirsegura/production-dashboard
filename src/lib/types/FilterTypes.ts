@@ -44,13 +44,7 @@ export interface FilterCondition {
   value: string | string[] | number | boolean | null
 }
 
-export interface QueryFilters {
-  conditions: FilterCondition[]
-  dateRange?: {
-    start: string
-    end: string
-  }
-}
+// Removed unused QueryFilters interface
 
 export interface AvailableFilterOptions {
   lineCodes: string[]
