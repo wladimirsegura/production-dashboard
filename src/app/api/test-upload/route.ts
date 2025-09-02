@@ -95,27 +95,30 @@ export async function POST() {
 
     console.log('Dummy data prepared, count:', dummyData.length)
 
-    // Test Supabase connection and insert using admin client
+    // Test Supabase connection and upsert using admin client
     console.log('Testing Supabase connection with admin client...')
     const { data, error } = await supabaseAdmin
       .from('productions')
-      .insert(dummyData)
+      .upsert(dummyData, {
+        onConflict: 'production_order_number',
+        count: 'exact'
+      })
       .select()
 
     if (error) {
-      console.error('Supabase test insert error:', error)
-      return NextResponse.json({ 
+      console.error('Supabase test upsert error:', error)
+      return NextResponse.json({
         success: false,
-        error: 'データベースへのテストデータ挿入中にエラーが発生しました',
+        error: 'データベースへのテストデータUPSERT中にエラーが発生しました',
         details: error.message,
         code: error.code
       }, { status: 500 })
     }
 
-    console.log('Test data inserted successfully, count:', data?.length)
-    return NextResponse.json({ 
+    console.log('Test data upserted successfully, count:', data?.length)
+    return NextResponse.json({
       success: true,
-      message: `${data.length}件のテストデータを正常に保存しました`,
+      message: `${data.length}件のテストデータを正常にUPSERTしました (新規追加または更新)`,
       count: data.length,
       data: data
     })

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import FilterPopup, { FilterState } from '@/components/FilterPopup'
 
 interface CrossTabData {
   customer: string
@@ -8,22 +9,47 @@ interface CrossTabData {
   total: number
 }
 
+interface UploadReport {
+  totalRecords: number
+  inserted: number
+  updated: number
+  processingTime: number
+  fileName: string
+  chunks?: number
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState('')
   const [testing, setTesting] = useState(false)
   const [debugging, setDebugging] = useState(false)
   const [cleaning, setCleaning] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [message, setMessage] = useState('')
+  const [uploadReport, setUploadReport] = useState<UploadReport | null>(null)
+  const [lastUploadedFile, setLastUploadedFile] = useState<string>('')
   const [crossTabData, setCrossTabData] = useState<CrossTabData[]>([])
   const [dates, setDates] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
-  const [selectedDate, setSelectedDate] = useState('') // Empty means show from today
+  const [selectedDate, setSelectedDate] = useState(() => {
+    // Set today's date as default in YYYY-MM-DD format
+    return new Date().toISOString().split('T')[0]
+  })
   const [displayMode, setDisplayMode] = useState<'quantity' | 'bending' | 'brazing'>('quantity')
   const [lineCodeFilter, setLineCodeFilter] = useState<string[]>([]) // Will be populated from API
+  const [lineCodePrefixFilter, setLineCodePrefixFilter] = useState<string[]>([]) // For filtering by first character
   const [availableLineCodes, setAvailableLineCodes] = useState<string[]>([])
+  const [availableLineCodePrefixes, setAvailableLineCodePrefixes] = useState<string[]>([])
+  const [availableMachineNumbers, setAvailableMachineNumbers] = useState<string[]>([])
+  const [availableSubcontractors, setAvailableSubcontractors] = useState<string[]>([])
+  const [subcontractorFilter, setSubcontractorFilter] = useState<string[]>([])
+  const [machineNumberFilter, setMachineNumberFilter] = useState<string[]>([
+    '30ｶﾞﾀ', 'NC-1', 'NC-2', 'NC-20', 'NC-21', 'NC-3', 'NC-30', 'NC-5', 'NC-50',
+    'NC-4', 'NC-6', 'NC-9', 'NC-8', 'NC-7', 'UNC08', 'UNC02', 'UNC10', 'UNC14',
+    'UNC13', 'UNC12', 'UNC15', 'UNC31', 'UNC7R', 'UNC42', 'UNC17', 'UNC16', 'UNC32', 'CHIYODA'
+  ])
+  const [isFilterPopupOpen, setIsFilterPopupOpen] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -38,194 +64,97 @@ export default function Home() {
     }
 
     setUploading(true)
-    setUploadProgress(0)
+    setUploadStatus('アップロードを開始中...')
     setMessage('')
 
     const formData = new FormData()
     formData.append('file', file)
 
     try {
-      // Use XMLHttpRequest to track both upload and batch processing progress
-      const xhr = new XMLHttpRequest()
-      
-      // Track current batch and total batches
-      let currentBatch = 0
-      let totalBatches = 1 // Default to 1, will be updated from server response
-      
-      // Create a promise to handle the XHR response
-      const uploadPromise = new Promise((resolve, reject) => {
-        // Set up progress tracking for file upload (10% of progress)
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            // File upload is only 10% of the total progress
-            const uploadPercentage = (event.loaded / event.total) * 10
-            setUploadProgress(Math.min(10, uploadPercentage))
-          }
-        })
-        
-        // Set up progress tracking for batch processing (90% of progress)
-        // We'll use a custom response handler to track batch progress
-        xhr.addEventListener('readystatechange', () => {
-          // Check for progress headers in partial responses
-          if (xhr.readyState === 3) { // LOADING state only
-            try {
-              // Try to parse streaming response lines
-              const responseText = xhr.responseText
-              if (responseText && responseText.trim()) {
-                // Split by newlines to get individual JSON objects
-                const lines = responseText.trim().split('\n')
-                for (const line of lines) {
-                  if (line.trim()) {
-                    try {
-                      const result = JSON.parse(line.trim())
-                      
-                      // Check if we have batch progress information
-                      if (result.currentBatch !== undefined && result.totalBatches !== undefined) {
-                        currentBatch = result.currentBatch
-                        totalBatches = result.totalBatches
-                        
-                        // Calculate batch progress with smoother increments
-                        if (totalBatches > 0) {
-                          // File upload is 10%, batch processing is 90%
-                          // Divide the 90% into 9 steps of 10% each
-                          const progressPerBatch = 90 / totalBatches
-                          const batchProgress = 10 + (currentBatch * progressPerBatch)
-                          
-                          // Round to nearest 10% for smoother UI
-                          const roundedProgress = Math.min(90, Math.round(batchProgress / 10) * 10)
-                          setUploadProgress(roundedProgress)
-                        }
-                      }
-                    } catch {
-                      // Skip invalid JSON lines
-                    }
-                  }
-                }
-              }
-            } catch {
-              // Ignore JSON parsing errors for partial responses
-            }
-          }
-        })
-        
-        // Set up completion handler
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              // Parse the final response from streaming data
-              const responseText = xhr.responseText.trim()
-              const lines = responseText.split('\n')
-              
-              // Get the last valid JSON line as the final result
-              let finalResult = null
-              for (let i = lines.length - 1; i >= 0; i--) {
-                const line = lines[i].trim()
-                if (line) {
-                  try {
-                    const parsed = JSON.parse(line)
-                    // Look for the final success message
-                    if (parsed.message && parsed.count !== undefined) {
-                      finalResult = parsed
-                      break
-                    }
-                  } catch {
-                    // Continue looking for valid JSON
-                  }
-                }
-              }
-              
-              if (finalResult) {
-                resolve(finalResult)
-              } else {
-                // Fallback: create a success result from the last progress update
-                resolve({ message: `データのアップロードが完了しました`, count: 0 })
-              }
-            } catch {
-              // If all parsing fails, still resolve as success since status is 200
-              resolve({ message: `データのアップロードが完了しました`, count: 0 })
-            }
-          } else {
-            try {
-              const responseText = xhr.responseText.trim()
-              const lines = responseText.split('\n')
-              let errorResult = null
-              
-              // Try to find error information in the response
-              for (let i = lines.length - 1; i >= 0; i--) {
-                const line = lines[i].trim()
-                if (line) {
-                  try {
-                    const parsed = JSON.parse(line)
-                    if (parsed.error) {
-                      errorResult = parsed
-                      break
-                    }
-                  } catch {
-                    // Continue looking
-                  }
-                }
-              }
-              
-              if (errorResult && errorResult.insertedSoFar !== undefined) {
-                const partialMessage = `${errorResult.insertedSoFar}件のデータが保存されました（処理中にエラーが発生）`
-                setMessage(partialMessage)
-                reject(new Error(errorResult.error))
-              } else {
-                reject(new Error(errorResult?.error || `Error: ${xhr.status}`))
-              }
-            } catch {
-              reject(new Error(`Error: ${xhr.status}`))
-            }
-          }
-        })
-        
-        // Set up error handler
-        xhr.addEventListener('error', () => {
-          reject(new Error('Network error during upload'))
-        })
-        
-        // Set up abort handler
-        xhr.addEventListener('abort', () => {
-          reject(new Error('Upload was aborted'))
-        })
+      // Use streaming API for real-time updates
+      const response = await fetch('/api/upload-csv-chunked?stream=true', {
+        method: 'POST',
+        body: formData,
       })
-      
-      // Add timeout to prevent hanging - increased for large files
-      const timeoutId = setTimeout(() => xhr.abort(), 300000) // 5 minute timeout
-      
-      // Open and send the request
-      xhr.open('POST', '/api/upload-csv', true)
-      xhr.send(formData)
-      
-      // Wait for the upload to complete
-      const result = await uploadPromise as { message: string }
-      
-      clearTimeout(timeoutId)
-      setUploadProgress(100) // Complete the progress
-      
-      setMessage(`成功: ${result.message}`)
-      setFile(null)
-      // Reset file input
-      const fileInput = document.getElementById('file-input') as HTMLInputElement
-      if (fileInput) fileInput.value = ''
-      // Refresh data
-      fetchCrossTabData()
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('aborted')) {
-          setMessage('アップロードがタイムアウトしました（5分）。ファイルサイズが大きすぎる可能性があります。')
-        } else {
-          setMessage(`エラー: ${error.message || 'アップロード中にエラーが発生しました'}`)
-        }
-      } else {
-        setMessage('アップロード中にエラーが発生しました')
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('Response body is not readable')
+      }
+
+      let buffer = ''
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+        
+        buffer += decoder.decode(value, { stream: true })
+        
+        // Process complete lines
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              if (data.status) {
+                setUploadStatus(data.status)
+              } else if (data.complete) {
+                if (data.message) {
+                  setMessage(`成功: ${data.message}`)
+                  
+                  // Set upload report for detailed display
+                  if (data.details) {
+                    setUploadReport({
+                      totalRecords: data.details.totalRecords || 0,
+                      inserted: data.details.inserted || 0,
+                      updated: data.details.updated || 0,
+                      processingTime: data.details.processingTime || 0,
+                      fileName: data.details.fileName || file.name,
+                      chunks: data.details.chunks || 1
+                    })
+                    // Update last uploaded file name
+                    setLastUploadedFile(data.details.fileName || file.name)
+                  }
+                  
+                  setFile(null)
+                  // Reset file input
+                  const fileInput = document.getElementById('file-input') as HTMLInputElement
+                  if (fileInput) fileInput.value = ''
+                  // Refresh data
+                  fetchCrossTabData()
+                } else if (data.error) {
+                  setMessage(`エラー: ${data.error}`)
+                  setUploadReport(null)
+                }
+              } else if (data.error) {
+                setMessage(`エラー: ${data.error}`)
+                setUploadReport(null)
+                break
+              }
+            } catch (parseError) {
+              console.error('Failed to parse SSE data:', parseError)
+            }
+          }
+        }
+      }
+      
+    } catch (error) {
+      setMessage(`エラー: ${error instanceof Error ? error.message : 'アップロード中にエラーが発生しました'}`)
+      setUploadReport(null)
       console.error('Upload error:', error)
     } finally {
       setUploading(false)
-      if (uploadProgress !== 100) {
-        setUploadProgress(0)
-      }
+      setTimeout(() => setUploadStatus(''), 3000) // Reset status after 3 seconds
     }
   }
 
@@ -408,15 +337,45 @@ export default function Home() {
     }
   }
 
-  const fetchCrossTabData = async () => {
+  useEffect(() => {
+    // Update available line code prefixes whenever available line codes change
+    const prefixes = [...new Set(availableLineCodes.map(code => code.charAt(0)))].sort()
+    setAvailableLineCodePrefixes(prefixes)
+    
+    // Select 'F' and 'D' prefixes by default
+    if (prefixes.length > 0 && lineCodePrefixFilter.length === 0) {
+      const defaultPrefixes = prefixes.filter(p => ['F', 'D'].includes(p))
+      setLineCodePrefixFilter(defaultPrefixes)
+    }
+  }, [availableLineCodes])
+
+  const handleLineCodePrefixChange = (prefix: string, checked: boolean) => {
+    if (checked) {
+      setLineCodePrefixFilter([...lineCodePrefixFilter, prefix])
+    } else {
+      setLineCodePrefixFilter(lineCodePrefixFilter.filter(p => p !== prefix))
+    }
+  }
+
+  const fetchCrossTabData = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       params.append('displayMode', displayMode)
       
-      // Only add lineCodes if we have some selected
-      if (lineCodeFilter.length > 0) {
-        params.append('lineCodes', lineCodeFilter.join(','))
+      // Add lineCodePrefixes if we have some selected
+      if (lineCodePrefixFilter.length > 0) {
+        params.append('lineCodePrefixes', lineCodePrefixFilter.join(','))
+      }
+      
+      // Add machineNumbers if we have some selected and we're in bending mode
+      if (displayMode === 'bending' && machineNumberFilter.length > 0) {
+        params.append('machineNumbers', machineNumberFilter.join(','))
+      }
+      
+      // Add subcontractors if we have some selected and we're in brazing mode
+      if (displayMode === 'brazing' && subcontractorFilter.length > 0) {
+        params.append('subcontractors', subcontractorFilter.join(','))
       }
       
       // If selectedDate is not empty, show 6 days from that date
@@ -426,7 +385,12 @@ export default function Home() {
       // Otherwise, show 6 days from today (default behavior)
 
       console.log('=== FRONTEND: fetchCrossTabData ===')
-      console.log('Request params:', { displayMode, lineCodes: lineCodeFilter, selectedDate: selectedDate || 'today' })
+      console.log('Request params:', {
+        displayMode,
+        lineCodePrefixes: lineCodePrefixFilter,
+        machineNumbers: machineNumberFilter,
+        selectedDate: selectedDate || 'today'
+      })
       console.log('Full URL:', `/api/crosstab?${params}`)
 
       const response = await fetch(`/api/crosstab?${params}`)
@@ -436,6 +400,7 @@ export default function Home() {
       console.log('Response status:', response.status)
       console.log('Dates received from backend:', result.dates)
       console.log('Available line codes:', result.availableLineCodes)
+      console.log('Available machine numbers:', result.availableMachineNumbers)
       console.log('Number of dates received:', result.dates?.length || 0)
 
       if (response.ok) {
@@ -443,11 +408,22 @@ export default function Home() {
         setCrossTabData(crossTabData)
         setDates(result.dates || [])
         
-        // Update available line codes and set all as selected initially
+        // Update available line codes for prefix generation
         if (result.availableLineCodes && availableLineCodes.length === 0) {
           const lineCodes = result.availableLineCodes.sort()
           setAvailableLineCodes(lineCodes)
-          setLineCodeFilter(lineCodes) // Select all line codes by default
+        }
+        
+        // Update available machine numbers
+        if (result.availableMachineNumbers) {
+          const machineNumbers = result.availableMachineNumbers.filter(Boolean).sort()
+          setAvailableMachineNumbers(machineNumbers)
+        }
+        
+        // Update available subcontractors
+        if (result.availableSubcontractors) {
+          const subcontractors = result.availableSubcontractors.filter(Boolean).sort()
+          setAvailableSubcontractors(subcontractors)
         }
         
         console.log('=== FRONTEND: State Updated ===')
@@ -462,7 +438,7 @@ export default function Home() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [displayMode, selectedDate, lineCodePrefixFilter, machineNumberFilter, subcontractorFilter, availableLineCodes.length])
 
   const navigateDates = (direction: 'prev' | 'next') => {
     const currentDate = new Date(selectedDate)
@@ -476,7 +452,17 @@ export default function Home() {
 
   useEffect(() => {
     fetchCrossTabData()
-  }, [displayMode, lineCodeFilter, selectedDate])
+  }, [fetchCrossTabData])
+
+  // Auto-select "(空白)" subcontractor when switching to brazing mode
+  useEffect(() => {
+    if (displayMode === 'brazing' && availableSubcontractors.includes('(空白)')) {
+      // If no subcontractors are selected, default to "(空白)"
+      if (subcontractorFilter.length === 0) {
+        setSubcontractorFilter(['(空白)'])
+      }
+    }
+  }, [displayMode, availableSubcontractors, subcontractorFilter.length])
 
   useEffect(() => {
     setMessage('')
@@ -488,14 +474,14 @@ export default function Home() {
     return `${date.getMonth() + 1}/${date.getDate()}\n${days[date.getDay()]}`
   }
 
-  // Calculate column totals
-  const calculateColumnTotals = () => {
+  // Calculate column totals with memoization
+  const columnTotals = useMemo(() => {
     const totals: { [date: string]: number } = {}
     dates.forEach(date => {
       totals[date] = crossTabData.reduce((sum, row) => sum + (row.dates[date] || 0), 0)
     })
     return totals
-  }
+  }, [crossTabData, dates])
 
   const getDisplayModeLabel = () => {
     switch (displayMode) {
@@ -506,13 +492,18 @@ export default function Home() {
     }
   }
 
-  const handleLineCodeChange = (lineCode: string, checked: boolean) => {
-    if (checked) {
-      setLineCodeFilter([...lineCodeFilter, lineCode])
-    } else {
-      setLineCodeFilter(lineCodeFilter.filter(code => code !== lineCode))
-    }
-  }
+
+  const handleFilterApply = useCallback((filters: FilterState) => {
+    setLineCodePrefixFilter(filters.lineCodePrefixes)
+    setMachineNumberFilter(filters.machineNumbers)
+    setSubcontractorFilter(filters.subcontractors)
+  }, [])
+
+  const getCurrentFilters = useCallback((): FilterState => ({
+    lineCodePrefixes: lineCodePrefixFilter,
+    machineNumbers: machineNumberFilter,
+    subcontractors: subcontractorFilter
+  }), [lineCodePrefixFilter, machineNumberFilter, subcontractorFilter])
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -522,6 +513,11 @@ export default function Home() {
         {/* CSV Upload Section */}
         <div className="bg-gray-800 border-2 border-gray-600 rounded-lg p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4 text-white border-b border-gray-600 pb-2">CSVファイルアップロード</h2>
+          {lastUploadedFile && (
+            <div className="mb-4 text-sm text-gray-300">
+              最後にアップロードしたファイル: <span className="font-semibold text-blue-300">{lastUploadedFile}</span>
+            </div>
+          )}
           <div className="flex items-center gap-4 flex-wrap">
             <input
               id="file-input"
@@ -568,18 +564,11 @@ export default function Home() {
               </button>
             </div>
           </div>
-          {/* Progress Bar */}
-          {uploading && (
-            <div className="mt-4">
-              <div className="flex justify-between text-sm text-gray-300 mb-2">
-                <span>アップロード中...</span>
-                <span>{Math.round(uploadProgress)}%</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
+          {/* Upload Status */}
+          {uploading && uploadStatus && (
+            <div className="mt-4 p-3 bg-blue-900 text-blue-200 border border-blue-600 rounded">
+              <div className="text-sm font-mono">
+                {uploadStatus}
               </div>
             </div>
           )}
@@ -587,6 +576,45 @@ export default function Home() {
           {message && (
             <div className={`mt-4 p-3 border rounded ${message.startsWith('成功') || message.startsWith('テスト成功') || message.startsWith('デバッグ') || message.startsWith('クリーンアップ成功') || message.startsWith('プレビュー成功') ? 'bg-green-900 text-green-200 border-green-600' : 'bg-red-900 text-red-200 border-red-600'}`}>
               {message}
+            </div>
+          )}
+          
+          {/* Upload Report */}
+          {uploadReport && (
+            <div className="mt-4 p-4 bg-blue-900 text-blue-200 border border-blue-600 rounded">
+              <h3 className="font-semibold text-lg mb-3 text-blue-100">📊 アップロード結果レポート</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="bg-blue-800 p-3 rounded">
+                  <div className="text-blue-300 text-xs uppercase tracking-wide">総レコード数</div>
+                  <div className="text-xl font-bold text-white">{uploadReport.totalRecords.toLocaleString()}</div>
+                </div>
+                <div className="bg-green-800 p-3 rounded">
+                  <div className="text-green-300 text-xs uppercase tracking-wide">新規追加</div>
+                  <div className="text-xl font-bold text-white">{uploadReport.inserted.toLocaleString()}</div>
+                </div>
+                <div className="bg-yellow-800 p-3 rounded">
+                  <div className="text-yellow-300 text-xs uppercase tracking-wide">更新</div>
+                  <div className="text-xl font-bold text-white">{uploadReport.updated.toLocaleString()}</div>
+                </div>
+                <div className="bg-purple-800 p-3 rounded">
+                  <div className="text-purple-300 text-xs uppercase tracking-wide">処理時間</div>
+                  <div className="text-xl font-bold text-white">{(uploadReport.processingTime / 1000).toFixed(1)}秒</div>
+                </div>
+              </div>
+              <div className="mt-3 text-xs text-blue-300">
+                ファイル: {uploadReport.fileName}
+                {uploadReport.chunks && uploadReport.chunks > 1 && (
+                  <span className="ml-2 px-2 py-1 bg-blue-700 rounded text-xs">
+                    {uploadReport.chunks}個のチャンクで処理
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setUploadReport(null)}
+                className="mt-3 px-3 py-1 bg-blue-700 text-blue-200 rounded text-xs hover:bg-blue-600"
+              >
+                レポートを閉じる
+              </button>
             </div>
           )}
         </div>
@@ -617,19 +645,23 @@ export default function Home() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">ラインコード</label>
-              <div className="flex gap-2 flex-wrap">
-                {availableLineCodes.map(code => (
-                  <label key={code} className="flex items-center text-white">
-                    <input
-                      type="checkbox"
-                      checked={lineCodeFilter.includes(code)}
-                      onChange={(e) => handleLineCodeChange(code, e.target.checked)}
-                      className="mr-1"
-                    />
-                    {code}
-                  </label>
-                ))}
+              <label className="block text-sm font-medium text-gray-300 mb-1">フィルター</label>
+              <button
+                onClick={() => setIsFilterPopupOpen(true)}
+                className="px-4 py-2 bg-purple-700 text-white border border-purple-600 rounded hover:bg-purple-600 font-semibold"
+              >
+                🔍 詳細フィルター
+              </button>
+              <div className="mt-2 text-xs text-gray-400">
+                {lineCodePrefixFilter.length > 0 && (
+                  <span>頭文字: {lineCodePrefixFilter.join(', ')}</span>
+                )}
+                {displayMode === 'bending' && machineNumberFilter.length > 0 && (
+                  <span className="ml-2">機械: {machineNumberFilter.length}台</span>
+                )}
+                {displayMode === 'brazing' && subcontractorFilter.length > 0 && (
+                  <span className="ml-2">協力企業: {subcontractorFilter.length}社</span>
+                )}
               </div>
             </div>
             <div className="flex gap-2 mt-6">
@@ -669,7 +701,18 @@ export default function Home() {
         <div className="bg-gray-800 border-2 border-gray-600 rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4 text-white border-b border-gray-600 pb-2">
             得意先別作業工数（{getDisplayModeLabel()}）
-            {!selectedDate && dates.length <= 6 && <span className="ml-4 text-sm font-normal text-green-400">直近6日分の生産データ</span>}
+            {!selectedDate && dates.length <= 6 && (
+              <span className="ml-4 text-sm font-normal text-green-400">
+                {new Date().toLocaleString('ja-JP', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                })}
+              </span>
+            )}
             {!selectedDate && dates.length > 6 && <span className="ml-4 text-sm font-normal text-orange-400">全生産日を表示中（{dates.length}日分）</span>}
             {selectedDate && <span className="ml-4 text-sm font-normal text-blue-400">{selectedDate}周辺の6日分</span>}
           </h2>
@@ -705,7 +748,7 @@ export default function Home() {
                   <tr className="bg-yellow-800">
                     <td className="border-2 border-gray-500 px-4 py-2 font-bold text-white bg-yellow-700">合計</td>
                     {dates.map((date) => {
-                      const columnTotal = calculateColumnTotals()[date] || 0
+                      const columnTotal = columnTotals[date] || 0
                       return (
                         <td key={date} className="border-2 border-gray-500 px-2 py-2 text-center font-bold text-white">
                           {columnTotal.toLocaleString()}
@@ -718,6 +761,18 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {/* Filter Popup */}
+        <FilterPopup
+          isOpen={isFilterPopupOpen}
+          onClose={() => setIsFilterPopupOpen(false)}
+          onApply={handleFilterApply}
+          currentFilters={getCurrentFilters()}
+          displayMode={displayMode}
+          availableLineCodes={availableLineCodes}
+          availableMachineNumbers={availableMachineNumbers}
+          availableSubcontractors={availableSubcontractors}
+        />
       </div>
     </div>
   )
