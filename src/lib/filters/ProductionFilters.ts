@@ -3,7 +3,7 @@
  * Handles query building and parameter management for production data
  */
 
-import type { FilterParams, FilterCondition } from '@/lib/types/FilterTypes'
+import type { FilterParams, FilterCondition, SupabaseQueryBuilder } from '@/lib/types/FilterTypes'
 import { FilterValidator } from '@/lib/validation/FilterValidator'
 import { FILTER_DEFAULTS } from '@/lib/constants/FilterDefaults'
 
@@ -182,8 +182,7 @@ export class ProductionFilters {
   /**
    * Build Supabase query from filter conditions
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  buildQuery(baseQuery: any): any {
+  buildQuery(baseQuery: SupabaseQueryBuilder): SupabaseQueryBuilder {
     let query = baseQuery
 
     // SIMPLIFIED APPROACH: Handle line code OR conditions first, then apply other filters

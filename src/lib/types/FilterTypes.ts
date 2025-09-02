@@ -56,3 +56,15 @@ export interface AvailableFilterOptions {
     max: string
   }
 }
+
+// Supabase Query Builder Types
+export interface SupabaseQueryBuilder {
+  eq(column: string, value: unknown): SupabaseQueryBuilder
+  in(column: string, values: unknown[]): SupabaseQueryBuilder
+  ilike(column: string, pattern: string): SupabaseQueryBuilder
+  gte(column: string, value: unknown): SupabaseQueryBuilder
+  lte(column: string, value: unknown): SupabaseQueryBuilder
+  not(column: string, operator: string, value: unknown): SupabaseQueryBuilder
+  is(column: string, value: null): SupabaseQueryBuilder
+  or(conditions: string): SupabaseQueryBuilder
+}

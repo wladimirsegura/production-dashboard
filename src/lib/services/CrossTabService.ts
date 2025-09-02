@@ -49,7 +49,7 @@ export class CrossTabService {
     const availableOptions = await this.getAvailableFilterOptions()
     
     // Fetch filtered data
-    const rawData = await this.fetchFilteredData(filters, options)
+    const rawData = await this.fetchFilteredData(filters)
     
     if (!rawData || rawData.length === 0) {
       return {
@@ -83,8 +83,7 @@ export class CrossTabService {
    * Fetch filtered production data using batching for performance
    */
   private async fetchFilteredData(
-    filters: ProductionFilters,
-    _options: CrossTabOptions
+    filters: ProductionFilters
   ): Promise<ProductionQueryResult[]> {
     const BATCH_SIZE = FILTER_DEFAULTS.batchSize
     let allData: ProductionQueryResult[] = []

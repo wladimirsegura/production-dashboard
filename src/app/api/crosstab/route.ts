@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     // Parse and validate filter parameters
     const searchParams = new URL(request.url).searchParams
     const filterParams: FilterParams = {
-      displayMode: (searchParams.get('displayMode') as any) || FILTER_DEFAULTS.displayMode,
+      displayMode: (searchParams.get('displayMode') as 'quantity' | 'bending' | 'brazing') || FILTER_DEFAULTS.displayMode,
       // TEMPORARY FIX: Don't apply default line code filters - let user data determine what's available
       lineCodePrefixes: searchParams.get('lineCodePrefixes')?.split(',').filter(Boolean) || [],
       machineNumbers: searchParams.get('machineNumbers')?.split(',').filter(Boolean) || [],

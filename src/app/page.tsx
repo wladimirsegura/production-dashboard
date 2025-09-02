@@ -37,10 +37,8 @@ export default function Home() {
     return new Date().toISOString().split('T')[0]
   })
   const [displayMode, setDisplayMode] = useState<'quantity' | 'bending' | 'brazing'>('quantity')
-  const [lineCodeFilter, setLineCodeFilter] = useState<string[]>([]) // Will be populated from API
   const [lineCodePrefixFilter, setLineCodePrefixFilter] = useState<string[]>([]) // For filtering by first character
   const [availableLineCodes, setAvailableLineCodes] = useState<string[]>([])
-  const [availableLineCodePrefixes, setAvailableLineCodePrefixes] = useState<string[]>([])
   const [availableMachineNumbers, setAvailableMachineNumbers] = useState<string[]>([])
   const [availableSubcontractors, setAvailableSubcontractors] = useState<string[]>([])
   const [subcontractorFilter, setSubcontractorFilter] = useState<string[]>([])
@@ -294,11 +292,11 @@ export default function Home() {
     try {
       const params = new URLSearchParams()
       params.append('displayMode', displayMode)
-      params.append('lineCodes', lineCodeFilter.join(','))
+      params.append('lineCodePrefixes', lineCodePrefixFilter.join(','))
       params.append('showAllProductionDates', 'true') // Show all production dates without limit
 
       console.log('=== FRONTEND: fetchCrossTabDataWithAllDates ===')
-      console.log('Request params:', { displayMode, lineCodes: lineCodeFilter, showAllProductionDates: true })
+      console.log('Request params:', { displayMode, lineCodePrefixes: lineCodePrefixFilter, showAllProductionDates: true })
       console.log('Full URL:', `/api/crosstab?${params}`)
 
       const response = await fetch(`/api/crosstab?${params}`)
@@ -340,22 +338,13 @@ export default function Home() {
   useEffect(() => {
     // Update available line code prefixes whenever available line codes change
     const prefixes = [...new Set(availableLineCodes.map(code => code.charAt(0)))].sort()
-    setAvailableLineCodePrefixes(prefixes)
     
     // Select 'F' and 'D' prefixes by default
     if (prefixes.length > 0 && lineCodePrefixFilter.length === 0) {
       const defaultPrefixes = prefixes.filter(p => ['F', 'D'].includes(p))
       setLineCodePrefixFilter(defaultPrefixes)
     }
-  }, [availableLineCodes])
-
-  const handleLineCodePrefixChange = (prefix: string, checked: boolean) => {
-    if (checked) {
-      setLineCodePrefixFilter([...lineCodePrefixFilter, prefix])
-    } else {
-      setLineCodePrefixFilter(lineCodePrefixFilter.filter(p => p !== prefix))
-    }
-  }
+  }, [availableLineCodes, lineCodePrefixFilter.length])
 
   const fetchCrossTabData = useCallback(async () => {
     setLoading(true)
@@ -378,11 +367,11 @@ export default function Home() {
         params.append('subcontractors', subcontractorFilter.join(','))
       }
       
-      // If selectedDate is not empty, show 6 days from that date
+      // If selectedDate is not empty, show 13 days from that date
       if (selectedDate) {
         params.append('selectedDate', selectedDate)
       }
-      // Otherwise, show 6 days from today (default behavior)
+      // Otherwise, show 13 days from today (default behavior)
 
       console.log('=== FRONTEND: fetchCrossTabData ===')
       console.log('Request params:', {
@@ -701,7 +690,7 @@ export default function Home() {
         <div className="bg-gray-800 border-2 border-gray-600 rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4 text-white border-b border-gray-600 pb-2">
             得意先別作業工数（{getDisplayModeLabel()}）
-            {!selectedDate && dates.length <= 6 && (
+            {!selectedDate && dates.length <= 13 && (
               <span className="ml-4 text-sm font-normal text-green-400">
                 {new Date().toLocaleString('ja-JP', {
                   year: 'numeric',
@@ -713,8 +702,8 @@ export default function Home() {
                 })}
               </span>
             )}
-            {!selectedDate && dates.length > 6 && <span className="ml-4 text-sm font-normal text-orange-400">全生産日を表示中（{dates.length}日分）</span>}
-            {selectedDate && <span className="ml-4 text-sm font-normal text-blue-400">{selectedDate}周辺の6日分</span>}
+            {!selectedDate && dates.length > 13 && <span className="ml-4 text-sm font-normal text-orange-400">全生産日を表示中（{dates.length}日分）</span>}
+            {selectedDate && <span className="ml-4 text-sm font-normal text-blue-400">{selectedDate}周辺の13日分</span>}
           </h2>
           {loading ? (
             <div className="text-center py-8 text-gray-300">データを読み込み中...</div>
