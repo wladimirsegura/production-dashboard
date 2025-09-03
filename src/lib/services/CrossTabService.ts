@@ -17,6 +17,7 @@ interface ProductionQueryResult {
   brazing_count: number | null
   line_code: string | null
   machine_number: string | null
+  subcontractor: string | null
 }
 
 interface ProcessedData {
@@ -45,8 +46,8 @@ export class CrossTabService {
     availableMachineNumbers: string[]
     availableSubcontractors: string[]
   }> {
-    // Get available options first (for filter UI)
-    const availableOptions = await this.getAvailableFilterOptions()
+    // Get available options first (for filter UI) - pass filters to get relevant subcontractors
+    const availableOptions = await this.getAvailableFilterOptions(filters)
     
     // Fetch filtered data
     const rawData = await this.fetchFilteredData(filters)
@@ -95,10 +96,10 @@ export class CrossTabService {
       batchCount++
       console.log(`📦 Fetching batch ${batchCount} (offset: ${offset}, limit: ${BATCH_SIZE})`)
 
-      // Build base query
+      // Build base query - include subcontractor for proper filtering
       let batchQuery = supabaseAdmin
         .from('productions')
-        .select('customer_name, due_date, order_quantity, bending_count, brazing_count, line_code, machine_number')
+        .select('customer_name, due_date, order_quantity, bending_count, brazing_count, line_code, machine_number, subcontractor')
         .not('due_date', 'is', null)
         .order('due_date', { ascending: true })
         .range(offset, offset + BATCH_SIZE - 1)
@@ -258,18 +259,40 @@ export class CrossTabService {
   }
 
   /**
-   * Get available filter options (cached for performance)
+   * Get available filter options based on current filters
    */
-  private async getAvailableFilterOptions(): Promise<{
+  private async getAvailableFilterOptions(filters?: ProductionFilters): Promise<{
     lineCodes: string[]
     machineNumbers: string[]
     subcontractors: string[]
   }> {
     try {
-      const { data, error } = await supabaseAdmin
+      // Build base query for available options
+      let optionsQuery = supabaseAdmin
         .from('productions')
         .select('machine_number, line_code, subcontractor')
         .not('due_date', 'is', null)
+
+      // Apply line code filters to get relevant subcontractors
+      if (filters) {
+        const conditions = filters.getConditions()
+        const lineCodeConditions = conditions.filter(c =>
+          c.field === 'line_code' && c.operator === 'ilike'
+        )
+        
+        if (lineCodeConditions.length > 0) {
+          if (lineCodeConditions.length === 1) {
+            optionsQuery = optionsQuery.ilike('line_code', lineCodeConditions[0].value as string)
+          } else {
+            const orConditions = lineCodeConditions.map(c =>
+              `line_code.ilike.${c.value}`
+            ).join(',')
+            optionsQuery = optionsQuery.or(orConditions)
+          }
+        }
+      }
+
+      const { data, error } = await optionsQuery
 
       if (error) {
         console.error('Error fetching available options:', error)
@@ -303,13 +326,18 @@ export class CrossTabService {
 
       const subcontractors = [...new Set(data
         .map((row: OptionsRow) => row.subcontractor)
-        .filter((sub: string | null): sub is string =>
-          sub !== null && sub.trim() !== ''
-        )
+        .map((sub: string | null) => sub === null || sub.trim() === '' ? '(空白)' : sub)
+        .filter((sub: string): sub is string => sub !== null)
       )] as string[]
 
-      // Add special "blank" option for null/empty subcontractors
-      const subcontractorOptions = ['(空白)', ...subcontractors.sort()]
+      // Sort subcontractors with '(空白)' first
+      const subcontractorOptions = subcontractors.sort((a, b) => {
+        if (a === '(空白)') return -1
+        if (b === '(空白)') return 1
+        return a.localeCompare(b)
+      })
+
+      console.log(`📋 Available options (filtered): lineCodes=${lineCodes.length}, machines=${machineNumbers.length}, subcontractors=${subcontractorOptions.length}`)
 
       return {
         lineCodes: lineCodes.sort(),

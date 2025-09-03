@@ -75,30 +75,40 @@ export class ProductionFilters {
       throw new Error(`Invalid subcontractors: ${validation.errors.join(', ')}`)
     }
 
-    // Handle special "blank" option for null/empty subcontractors
-    const hasBlankOption = subcontractors.includes('(空白)')
-    const regularSubcontractors = subcontractors.filter(s => s !== '(空白)')
-
-    if (hasBlankOption && regularSubcontractors.length > 0) {
-      // Both blank and regular subcontractors selected - use OR condition
+    // Handle subcontractor filtering with proper OR logic
+    const hasBlank = subcontractors.includes('(空白)')
+    const regularSubs = subcontractors.filter(sub => sub !== '(空白)')
+    
+    console.log('🔧 Subcontractor filter logic:', {
+      selected: subcontractors,
+      hasBlank,
+      regularSubs,
+      regularSubsCount: regularSubs.length
+    })
+    
+    if (hasBlank && regularSubs.length > 0) {
+      // Both blank and regular subcontractors - use OR condition
+      console.log('🔧 Using mixed subcontractor filter (blank + regular)')
       this.conditions.push({
-        field: 'subcontractor_or_null',
+        field: 'subcontractor_with_blank',
         operator: 'custom',
-        value: regularSubcontractors
+        value: regularSubs
       })
-    } else if (hasBlankOption) {
-      // Only blank subcontractors selected
+    } else if (hasBlank && regularSubs.length === 0) {
+      // Only blank selected - filter for null/empty values
+      console.log('🔧 Using blank-only subcontractor filter')
       this.conditions.push({
         field: 'subcontractor',
         operator: 'is_null',
         value: null
       })
-    } else {
+    } else if (regularSubs.length > 0) {
       // Only regular subcontractors selected
+      console.log('🔧 Using regular subcontractor filter:', regularSubs)
       this.conditions.push({
         field: 'subcontractor',
         operator: 'in',
-        value: regularSubcontractors
+        value: regularSubs
       })
     }
 
@@ -236,13 +246,23 @@ export class ProductionFilters {
           query = query.is(condition.field, null)
           break
         case 'custom':
-          if (condition.field === 'subcontractor_or_null') {
-            // Handle OR condition for subcontractor (regular values OR null)
+          if (condition.field === 'subcontractor_with_blank') {
+            // Handle condition for subcontractor (regular values OR null/empty)
             const subcontractors = condition.value as string[]
+            console.log('🔧 Building OR condition for subcontractors:', subcontractors)
+            
+            // Build OR conditions: null OR each selected subcontractor
+            // Note: Supabase OR syntax requires proper escaping for special characters
             const orConditions = [
               'subcontractor.is.null',
-              ...subcontractors.map(sub => `subcontractor.eq.${sub}`)
+              ...subcontractors.map(sub => {
+                // Escape special characters in subcontractor names
+                const escapedSub = sub.replace(/[,()]/g, '\\$&')
+                return `subcontractor.eq."${escapedSub}"`
+              })
             ].join(',')
+            
+            console.log('🔧 OR conditions string:', orConditions)
             query = query.or(orConditions)
           }
           break
